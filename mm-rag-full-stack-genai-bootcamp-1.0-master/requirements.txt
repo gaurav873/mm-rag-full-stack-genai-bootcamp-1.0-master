@@ -31,3 +31,4 @@ nbconvert
 
 # Legacy setup.py compatibility
 setuptools>=68
+
