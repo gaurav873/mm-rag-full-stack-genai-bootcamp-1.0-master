@@ -1,14 +1,20 @@
+import enum
 from datetime import datetime
+from sqlalchemy import Enum
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from uuid import UUID, uuid4
-
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 from sqlalchemy import func
 
 class Base(DeclarativeBase):
     pass
 
+class EmbeddingStatus(str, enum.Enum):
+    pending = "pending"
+    embedded = "embedded"
+    failed = "failed"
+    stale="stale"
 
 class Document(Base):
     __tablename__ = "documents"
@@ -28,17 +34,25 @@ class Document(Base):
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow
+        DateTime(timezone=True),
+        server_default=func.now(),
     )
 
     versions: Mapped[list["DocumentVersion"]] = relationship(
         back_populates="document"
     )
+    source_type: Mapped[str] = mapped_column(
+    String(20),
+    nullable=False,
+    index=True
+    )
 
 
 class DocumentVersion(Base):
     __tablename__ = "document_versions"
+    __table_args__ = (
+    UniqueConstraint("document_id", "version_number"),
+)
     version_id: Mapped[UUID] = mapped_column(
     PG_UUID(as_uuid=True),
     primary_key=True,
@@ -47,7 +61,8 @@ class DocumentVersion(Base):
 
     document_id: Mapped[UUID] = mapped_column(
     PG_UUID(as_uuid=True),
-    ForeignKey("documents.document_id"),
+    ForeignKey("documents.document_id", ondelete="CASCADE"),
+    index=True,
     nullable=False
     )
 
@@ -61,20 +76,26 @@ class DocumentVersion(Base):
     total_pages: Mapped[int] = mapped_column(Integer)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow
-    )
+        DateTime(timezone=True),
+        server_default=func.now(),
 
+    )
     document: Mapped["Document"] = relationship(
-        back_populates="versions"
+        back_populates="versions",
+        cascade="all, delete-orphan"
     )
 
     pages: Mapped[list["DocumentPage"]] = relationship(
-        back_populates="version"
+        back_populates="version",
+        cascade="all, delete-orphan"
     )
 
 class DocumentPage(Base):
     __tablename__ = "document_pages"
+
+    __table_args__ = (
+    UniqueConstraint("version_id", "page_number"),
+    )
 
     page_id: Mapped[UUID] = mapped_column(
     PG_UUID(as_uuid=True),
@@ -84,7 +105,8 @@ class DocumentPage(Base):
 
     version_id: Mapped[UUID] = mapped_column(
     PG_UUID(as_uuid=True),
-    ForeignKey("document_versions.version_id"),
+    ForeignKey("document_versions.version_id", ondelete="CASCADE"),
+    index=True,
     nullable=False
     )
 
@@ -110,15 +132,15 @@ class DocumentPage(Base):
         default=False
     )
     tables: Mapped[list["DocumentTable"]] = relationship(
-    back_populates="page"
+    back_populates="page",cascade="all, delete-orphan"
     )
 
     version: Mapped["DocumentVersion"] = relationship(
-        back_populates="pages"
+        back_populates="pages",cascade="all, delete-orphan"
     )
 
     images: Mapped[list["DocumentImage"]] = relationship(
-        back_populates="page"
+        back_populates="page",cascade="all, delete-orphan"
     )
 class DocumentImage(Base):
     __tablename__ = "document_images"
@@ -129,11 +151,26 @@ class DocumentImage(Base):
         default=uuid4
     )
 
-    page_id: Mapped[int] = mapped_column(
-        ForeignKey("document_pages.page_id"),
-        nullable=False
-    )
-
+    document_id: Mapped[UUID] = mapped_column(
+            PG_UUID(as_uuid=True),
+            ForeignKey("documents.document_id", ondelete="CASCADE"),
+            index=True,
+            nullable=False
+        )
+    
+    version_id: Mapped[UUID] = mapped_column(
+            PG_UUID(as_uuid=True),
+            ForeignKey("document_versions.version_id", ondelete="CASCADE"),
+            index=True,
+            nullable=False
+        )
+    
+    page_id: Mapped[UUID] = mapped_column(
+            PG_UUID(as_uuid=True),
+            ForeignKey("document_pages.page_id", ondelete="CASCADE"),
+            index=True,
+            nullable=False
+        )
     image_number: Mapped[int] = mapped_column(
         Integer,
         nullable=False
@@ -147,6 +184,10 @@ class DocumentImage(Base):
     image_ext: Mapped[str] = mapped_column(
         String(20),
         nullable=False
+    )
+    title: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True
     )
 
     image_hash: Mapped[str] = mapped_column(
@@ -168,15 +209,25 @@ class DocumentImage(Base):
         Text,
         nullable=True
     )
-
-    embedding_status: Mapped[str] = mapped_column(
-        String(20),
-        default="pending",
+    embedding_status: Mapped[EmbeddingStatus] = mapped_column(
+    Enum(EmbeddingStatus, name="embedding_status_enum"),
+    default=EmbeddingStatus.pending,
+    nullable=False,
+    )
+    
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
         nullable=False
     )
-
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False
+    )
     page: Mapped["DocumentPage"] = relationship(
-        back_populates="images"
+        back_populates="images",
     )
 class DocumentTable(Base):
     __tablename__ = "document_tables"
@@ -189,19 +240,22 @@ class DocumentTable(Base):
 
     document_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("documents.document_id"),
+        ForeignKey("documents.document_id", ondelete="CASCADE"),
+        index=True,
         nullable=False
     )
 
     version_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("document_versions.version_id"),
+        ForeignKey("document_versions.version_id", ondelete="CASCADE"),
+        index=True,
         nullable=False
     )
 
     page_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("document_pages.page_id"),
+        ForeignKey("document_pages.page_id", ondelete="CASCADE"),
+        index=True,
         nullable=False
     )
 
@@ -227,7 +281,7 @@ class DocumentTable(Base):
     )
 
     # Table structure: columns, types, etc.
-    schema: Mapped[dict] = mapped_column(
+    table_schema: Mapped[dict] = mapped_column(
         JSONB,
         nullable=False
     )
@@ -244,25 +298,31 @@ class DocumentTable(Base):
         nullable=True
     )
 
-    # pending / embedded / stale / failed
-    embedding_status: Mapped[str] = mapped_column(
-        String(20),
-        default="pending",
-        nullable=False
+    # pending / embedded /  failed
+    embedding_status: Mapped[EmbeddingStatus] = mapped_column(
+    Enum(EmbeddingStatus, name="embedding_status_enum"),
+    default=EmbeddingStatus.pending,
+    nullable=False,
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
+        DateTime(timezone=True),
+        server_default=func.now(),
         nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False
+    )
+    content_hash: Mapped[str] = mapped_column(
+    String(64),
+    nullable=False,
+    index=True
     )
 
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-        nullable=False
-    )
+
     page: Mapped["DocumentPage"] = relationship(
-    back_populates="tables"
+    back_populates="tables",
     )
