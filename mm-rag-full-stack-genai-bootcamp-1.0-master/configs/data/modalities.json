@@ -1,0 +1,7 @@
+{
+    "documents": {
+        "extensions": [".pdf", ".docx", ".txt", ".md", ".html"],
+        "max_size_mb": 20,
+        "embedder": "text-embedding-3-small"
+    }
+}
