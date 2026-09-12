@@ -39,7 +39,8 @@ class Document(Base):
     )
 
     versions: Mapped[list["DocumentVersion"]] = relationship(
-        back_populates="document"
+        back_populates="document",
+        cascade="all, delete-orphan"
     )
     source_type: Mapped[str] = mapped_column(
     String(20),
@@ -82,7 +83,6 @@ class DocumentVersion(Base):
     )
     document: Mapped["Document"] = relationship(
         back_populates="versions",
-        cascade="all, delete-orphan"
     )
 
     pages: Mapped[list["DocumentPage"]] = relationship(
@@ -136,7 +136,7 @@ class DocumentPage(Base):
     )
 
     version: Mapped["DocumentVersion"] = relationship(
-        back_populates="pages",cascade="all, delete-orphan"
+        back_populates="pages"
     )
 
     images: Mapped[list["DocumentImage"]] = relationship(

@@ -1,10 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import create_engine
-import json
-import os
 from pathlib import Path
-from functools import lru_cache
-
 
 
 class Settings(BaseSettings):
@@ -19,5 +15,5 @@ class Settings(BaseSettings):
 settings = Settings()
 engine = create_engine(settings.DATABASE_URL)
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parents[2]
 

@@ -1,9 +1,7 @@
 from pydantic import BaseModel, ValidationError,Field
 import json
-import os
-from pathlib import Path
 from functools import lru_cache
-from config import BASE_DIR
+from api.configs.settings import BASE_DIR
 
 
 class ModalityEntry(BaseModel):
@@ -12,8 +10,8 @@ class ModalityEntry(BaseModel):
     embedder: str = Field(min_length=1)
 
 @lru_cache
-def load_modality_config() -> dict[str, ModalityEntry]:
-    config_path = BASE_DIR / "configs" / "data" / "modalities.json"
+def Validate_Document_Format() -> dict[str, ModalityEntry]:
+    config_path = BASE_DIR / "data" / "modalities.json"
     # full_path = (BASE_DIR / config_path).resolve()
 
     if not config_path.exists():
@@ -24,6 +22,7 @@ def load_modality_config() -> dict[str, ModalityEntry]:
 
     with open(config_path, "r") as f:
         raw = json.load(f)
+        print(f"Loaded modality config from {config_path}: {raw}")  
 
     try:
         return {
