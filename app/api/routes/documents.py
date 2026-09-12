@@ -1,9 +1,12 @@
+import logging
 from pathlib import Path
 import uuid
 from typing import Annotated
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File,Depends, HTTPException
 from api.configs.document_format import Validate_Document_Format
 from api.validation.document_validation import DocumentValidator 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -25,23 +28,46 @@ async def upload_files(files: Annotated[list[UploadFile], File(...)]):
     uploaded_files = []
     failed_files = []
     validator = DocumentValidator(document_config)
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+
     for file in files:
-        contents = await file.read()
-
-        validations = [
-        validator.validate_filename(file.filename),
-        validator.validate_extension(file.filename),
-        validator.validate_size(contents),
-    ]
-        is_valid, error = validator.validate_size(contents)
-
+        is_valid, error = validator.validate_extension(file.filename)
         if not is_valid:
-            failed_files.append({
-                "filename": file.filename,
-                "reason": error
-            })
+            failed_files.append({"filename": file.filename, "reason": error})
             continue
 
+        contents = await file.read()
+        is_valid, error = validator.validate_size(contents)
+        if not is_valid:
+            failed_files.append({"filename": file.filename, "reason": error})
+            continue
+
+        uploaded_files.append({"filename": file.filename, "contents": contents})
+
+    # Case 1: every single file failed validation
+    if not uploaded_files and failed_files:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "All files failed validation",
+                "failed": failed_files,
+            },
+        )
+
+    # Case 2: some passed, some failed — partial success
+    if failed_files:
+        return {
+            "message": f"{len(uploaded_files)} file(s) uploaded, {len(failed_files)} failed validation",
+            "uploaded": [f["filename"] for f in uploaded_files],
+            "failed": failed_files,
+        }
+    # Case 3: everything passed
+    
+    return {
+        "message": f"All {len(uploaded_files)} file(s) uploaded successfully",
+        "uploaded": [f["filename"] for f in uploaded_files],
+    }
 
 
 
