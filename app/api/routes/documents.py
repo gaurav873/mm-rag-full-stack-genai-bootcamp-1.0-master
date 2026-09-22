@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, UploadFile, File,Depends, HTTPException
 from api.configs.document_format import Validate_Document_Format
 from api.validation.document_validation import DocumentValidator 
+from api.utility.utitlity_fucntion import read_file_contents, compute_file_hash, check_existing_document
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ async def upload_files(files: Annotated[list[UploadFile], File(...)]):
     '''
     uploaded_files = []
     failed_files = []
-    validator = DocumentValidator(document_config)
+    validator = DocumentValidator()
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
@@ -37,12 +38,15 @@ async def upload_files(files: Annotated[list[UploadFile], File(...)]):
             failed_files.append({"filename": file.filename, "reason": error})
             continue
 
-        contents = await file.read()
         is_valid, error = validator.validate_size(contents)
         if not is_valid:
             failed_files.append({"filename": file.filename, "reason": error})
             continue
-
+        contents = read_file_contents(file) # reading file contents
+        file_hash = compute_file_hash(contents)
+        status, existing_doc, latest_version = check_existing_document(
+            db, file.filename, file_hash
+        )
         uploaded_files.append({"filename": file.filename, "contents": contents})
 
     # Case 1: every single file failed validation
