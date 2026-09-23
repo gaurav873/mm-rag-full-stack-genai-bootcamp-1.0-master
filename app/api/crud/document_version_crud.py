@@ -1,29 +1,41 @@
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
-from .models import Document, DocumentVersion, PageHash
-def create_version(
+from api.models.model import Document, DocumentVersion, PageHash
+
+def create_document_version(
     db: Session,
-    document_id: int,
+    document_id: UUID,
     document_hash: str,
-    storage_path: str,
+    total_pages: int,
 ) -> DocumentVersion:
-    """Create a new version under an existing document, auto-incrementing version_number."""
-    last = get_latest_version(db, document_id)
-    next_version_number = (last.version_number + 1) if last else 1
+    """
+    Create a new DocumentVersion for an existing Document.
+    Auto-increments version_number based on existing versions,
+    and updates Document.current_version to match.
+    """
+    document = db.get(Document, document_id)
+    if document is None:
+        raise ValueError(f"Document {document_id} not found")
+
+    next_version_number = document.current_version + 1
 
     version = DocumentVersion(
         document_id=document_id,
         version_number=next_version_number,
         document_hash=document_hash,
-        storage_path=storage_path,
-        created_at=datetime.now(timezone.utc),
+        total_pages=total_pages,
     )
     db.add(version)
-    db.flush()
-    return version
 
+    document.current_version = next_version_number
+
+    db.commit()
+    db.refresh(version)
+    return version
 
 def get_latest_version(db: Session, document_id: int) -> DocumentVersion | None:
     stmt = (

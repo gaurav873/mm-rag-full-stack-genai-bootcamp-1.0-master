@@ -1,75 +1,83 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
-
-from .models import Document, DocumentVersion, PageHash
 
 
-# ---------- Document ----------
-def save_uploaded_document(
+from api.models.model import Document, DocumentVersion, PageHash
+
+
+# # ---------- Document ----------
+# def save_uploaded_document(
+#     db: Session,
+#     filename: str,
+#     contents: bytes,
+#     file_hash: str,
+#     page_hashes: list[str],
+#     storage_path: str,
+#     check_result: dict,
+#     owner_id: int | None = None,  # if you've added auth/ownership
+# ) -> dict:
+#     """
+#     Persist an uploaded file based on the outcome of check_existing_document.
+#     Assumes the file bytes have ALREADY been written to `storage_path` on disk
+#     (or object storage) before this is called — this function only touches the DB.
+#     """
+#     status = check_result["status"]
+
+#     if status == "duplicate":
+#         # nothing to save — it's identical to something that already exists
+#         return {
+#             "status": "duplicate",
+#             "document_id": check_result["document_id"],
+#             "version": check_result["matched_version"],
+#         }
+
+#     if status == "new_version":
+#         document_id = check_result["document_id"]
+#         version = create_version(
+#             db,
+#             document_id=document_id,
+#             document_hash=file_hash,
+#             storage_path=storage_path,
+#         )
+#         create_page_hashes(db, version_id=version.version_id, page_hashes=page_hashes)
+
+#         return {
+#             "status": "new_version",
+#             "document_id": document_id,
+#             "version": version,
+#         }
+
+#     # status == "new"
+#     document = create_document(db, filename=filename, owner_id=owner_id)
+#     version = create_version(
+#         db,
+#         document_id=document.document_id,
+#         document_hash=file_hash,
+#         storage_path=storage_path,
+#     )
+#     create_page_hashes(db, version_id=version.version_id, page_hashes=page_hashes)
+
+#     return {
+#         "status": "new",
+#         "document_id": document.document_id,
+#         "version": version,
+#     }
+
+def create_document(
     db: Session,
     filename: str,
-    contents: bytes,
-    file_hash: str,
-    page_hashes: list[str],
-    storage_path: str,
-    check_result: dict,
-    owner_id: int | None = None,  # if you've added auth/ownership
-) -> dict:
-    """
-    Persist an uploaded file based on the outcome of check_existing_document.
-    Assumes the file bytes have ALREADY been written to `storage_path` on disk
-    (or object storage) before this is called — this function only touches the DB.
-    """
-    status = check_result["status"]
-
-    if status == "duplicate":
-        # nothing to save — it's identical to something that already exists
-        return {
-            "status": "duplicate",
-            "document_id": check_result["document_id"],
-            "version": check_result["matched_version"],
-        }
-
-    if status == "new_version":
-        document_id = check_result["document_id"]
-        version = create_version(
-            db,
-            document_id=document_id,
-            document_hash=file_hash,
-            storage_path=storage_path,
-        )
-        create_page_hashes(db, version_id=version.version_id, page_hashes=page_hashes)
-
-        return {
-            "status": "new_version",
-            "document_id": document_id,
-            "version": version,
-        }
-
-    # status == "new"
-    document = create_document(db, filename=filename, owner_id=owner_id)
-    version = create_version(
-        db,
-        document_id=document.document_id,
-        document_hash=file_hash,
-        storage_path=storage_path,
+    source_type: str,
+) -> Document:
+    """Create a bare Document (no version/pages yet)."""
+    document = Document(
+        filename=filename,
+        source_type=source_type,
+        current_version=0,  # bumped to 1 once the first version is created
     )
-    create_page_hashes(db, version_id=version.version_id, page_hashes=page_hashes)
-
-    return {
-        "status": "new",
-        "document_id": document.document_id,
-        "version": version,
-    }
-
-def create_document(db: Session, filename: str) -> Document:
-    """Create a new Document record (parent row, no version/content yet)."""
-    document = Document(filename=filename, created_at=datetime.now(timezone.utc))
     db.add(document)
-    db.flush()  # populate document.document_id without committing
+    db.commit()
+    db.refresh(document)
     return document
-
 
 def get_document_by_id(db: Session, document_id: int) -> Document | None:
     return db.get(Document, document_id)
