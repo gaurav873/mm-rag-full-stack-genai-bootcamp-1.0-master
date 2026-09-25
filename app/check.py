@@ -1,11 +1,7 @@
-# check.py
-import os
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from api.configs.settings import engine
+from sqlalchemy import text
 
-load_dotenv()
-
-engine = create_engine(os.environ["DATABASE_URL"])
 with engine.connect() as conn:
-    result = conn.execute(text("SELECT 1"))
-    print("Connected OK:", result.scalar())
+    result = conn.execute(text("SELECT * FROM document_pages"))
+    for row in result:
+        print(row)

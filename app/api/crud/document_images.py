@@ -1,7 +1,7 @@
 from uuid import UUID
 from attr import dataclass
 from requests import Session
-from app.api.models.model import DocumentImage, EmbeddingStatus
+from api.models.model import DocumentImage, EmbeddingStatus
 
 @dataclass
 class ImageInput:

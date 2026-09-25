@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from uuid import UUID
 from requests import Session
 from api.models.model import DocumentPage
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 @dataclass
 class PageInput:
@@ -34,3 +36,27 @@ def create_document_pages(
     for page in page_objs:
         db.refresh(page)
     return page_objs
+
+def create_page_hashes(db: Session, version_id: int, page_hashes: list[str]) -> list[DocumentPage]:
+    """Bulk-insert page hashes for a version, in page order (index 0 = page 1)."""
+    pages = [
+        DocumentPage(version_id=version_id, page_number=i + 1, page_hash=h)
+        for i, h in enumerate(page_hashes)
+    ]
+    db.add_all(pages)
+    db.flush()
+    return pages
+
+def get_page_hashes_by_version(db: Session, version_id: int) -> list[DocumentPage]:
+    stmt = (
+        select(DocumentPage)
+        .where(DocumentPage.version_id == version_id)
+        .order_by(DocumentPage.page_number.asc())
+    )
+    return list(db.execute(stmt).scalars().all())
+
+
+def find_documents_by_page_hash(db: Session, page_hash: str) -> list[DocumentPage]:
+    """Global reuse check — which versions/pages elsewhere share this exact page content?"""
+    stmt = select(DocumentPage).where(DocumentPage.page_hash == page_hash)
+    return list(db.execute(stmt).scalars().all())

@@ -66,7 +66,7 @@ class DocumentVersion(Base):
     index=True,
     nullable=False
     )
-
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     version_number: Mapped[int] = mapped_column(
         Integer
     )
@@ -81,6 +81,7 @@ class DocumentVersion(Base):
         server_default=func.now(),
 
     )
+    document_object_key: Mapped[str ] = mapped_column(String(500), nullable=False)
     document: Mapped["Document"] = relationship(
         back_populates="versions",
     )
@@ -89,6 +90,8 @@ class DocumentVersion(Base):
         back_populates="version",
         cascade="all, delete-orphan"
     )
+    embedding_status: Mapped[EmbeddingStatus] = mapped_column(
+   Enum(EmbeddingStatus, name="embedding_status_enum"), default=EmbeddingStatus.pending, nullable=False)
 
 class DocumentPage(Base):
     __tablename__ = "document_pages"
@@ -109,10 +112,12 @@ class DocumentPage(Base):
     index=True,
     nullable=False
     )
-
+    page_object_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
     page_number: Mapped[int] = mapped_column(
         Integer
     )
+    page_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    page_ocr_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     page_hash: Mapped[str] = mapped_column(
         String(64)
@@ -142,6 +147,8 @@ class DocumentPage(Base):
     images: Mapped[list["DocumentImage"]] = relationship(
         back_populates="page",cascade="all, delete-orphan"
     )
+    embedding_status: Mapped[EmbeddingStatus] = mapped_column(
+    Enum(EmbeddingStatus, name="embedding_status_enum"), default=EmbeddingStatus.pending, nullable=False)
 class DocumentImage(Base):
     __tablename__ = "document_images"
 
@@ -176,10 +183,7 @@ class DocumentImage(Base):
         nullable=False
     )
 
-    object_key: Mapped[str] = mapped_column(
-        String(500),
-        nullable=False
-    )
+    image_object_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     image_ext: Mapped[str] = mapped_column(
         String(20),
@@ -244,6 +248,7 @@ class DocumentTable(Base):
         index=True,
         nullable=False
     )
+    table_object_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     version_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -281,16 +286,10 @@ class DocumentTable(Base):
     )
 
     # Table structure: columns, types, etc.
-    table_schema: Mapped[dict] = mapped_column(
-        JSONB,
-        nullable=False
-    )
+    table_schema: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     # Cleaned structured rows
-    normalized_data: Mapped[list | dict] = mapped_column(
-        JSONB,
-        nullable=False
-    )
+    normalized_data: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
 
     # Search-friendly description
     summary: Mapped[str | None] = mapped_column(

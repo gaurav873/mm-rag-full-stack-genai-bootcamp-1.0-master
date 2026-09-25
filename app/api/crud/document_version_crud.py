@@ -3,8 +3,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
-
-from api.models.model import Document, DocumentVersion, PageHash
+from api.models.model import Document, DocumentVersion
 
 def create_document_version(
     db: Session,

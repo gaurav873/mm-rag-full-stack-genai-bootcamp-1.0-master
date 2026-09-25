@@ -1,14 +1,11 @@
 # crud_controller.py
 from uuid import UUID
 from sqlalchemy.orm import Session
-
+from api.crud.document_crud import create_document
+from api.crud.document_version_crud import create_document_version
+from api.crud.document_page_crud import create_document_pages, PageInput
 from api.crud.document_images import ImageInput, create_document_image
-from api.crud.document_table import TableInput
-from document_crud import create_document
-from document_version_crud import create_document_version
-from document_page_crud import create_document_pages, PageInput
-from document_images import create_document_image
-from document_table import create_document_table
+from api.crud.document_table import TableInput, create_document_table
 
 def document_creation_controller(
     db: Session,
